@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <!-- Nhãn thời gian (ngày / tuần / tháng) -->
+    <TextView
+        android:id="@+id/textTrendLabel"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        tools:text="Nhãn" />
+
+    <!-- Thanh xanh = tỉ lệ đạt, phần còn lại (đỏ) = tỉ lệ lỗi -->
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/progressTrend"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:indeterminate="false"
+        android:max="100"
+        app:indicatorColor="@color/success"
+        app:trackColor="@color/error"
+        app:trackCornerRadius="4dp"
+        app:trackThickness="10dp" />
+
+    <TextView
+        android:id="@+id/textTrendPercent"
+        android:layout_width="44dp"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:textColor="@color/primary_dark"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="0%" />
+</LinearLayout>
