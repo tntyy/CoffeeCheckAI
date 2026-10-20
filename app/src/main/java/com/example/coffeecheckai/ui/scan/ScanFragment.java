@@ -27,7 +27,11 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.coffeecheckai.R;
+import com.example.coffeecheckai.data.AppDatabase;
+import com.example.coffeecheckai.data.KetQuaKiemTra;
+import com.example.coffeecheckai.ml.BeanDetector;
 import com.example.coffeecheckai.ml.CoffeeClassifier;
+import com.example.coffeecheckai.utils.AppSettings;
 import com.example.coffeecheckai.utils.GoiYHelper;
 import com.example.coffeecheckai.utils.ImageUtils;
 import com.google.android.material.button.MaterialButton;
@@ -82,6 +86,10 @@ public class ScanFragment extends Fragment {
 
     private CoffeeClassifier classifier;
 
+    // Model YOLO tìm vị trí hạt. Null nếu chưa có bean_detector.tflite trong
+    // assets -> tự động dùng OpenCV cũ (ImageUtils.findAllBeanRects).
+    private BeanDetector beanDetector;
+
     // =========================
     // BACKGROUND THREAD
     // =========================
@@ -124,6 +132,8 @@ public class ScanFragment extends Fragment {
                 Executors.newSingleThreadExecutor();
 
         initClassifier();
+
+        initDetector();
 
         startCamera();
 
@@ -182,6 +192,37 @@ public class ScanFragment extends Fragment {
 
         progressProcessing =
                 root.findViewById(R.id.progressProcessing);
+    }
+
+    // =========================================================
+    // INIT DETECTOR (YOLO)
+    // =========================================================
+
+    private void initDetector() {
+
+        try {
+
+            beanDetector =
+                    new BeanDetector(
+                            requireContext()
+                    );
+
+            Log.d(
+                    "ScanFragment",
+                    "BeanDetector (YOLO) loaded successfully"
+            );
+
+        } catch (Exception e) {
+
+            // Chưa có bean_detector.tflite hoặc model lỗi -> dùng OpenCV cũ.
+            beanDetector = null;
+
+            Log.w(
+                    "ScanFragment",
+                    "Không tải được BeanDetector, dùng OpenCV dự phòng",
+                    e
+            );
+        }
     }
 
     // =========================================================
@@ -493,6 +534,11 @@ public class ScanFragment extends Fragment {
 
         showLoading();
 
+        final android.content.Context appContext =
+                requireContext().getApplicationContext();
+        final AppSettings settings = new AppSettings(appContext);
+        final BeanDetector detector = beanDetector;
+
         executorService.execute(
                 () -> {
 
@@ -527,19 +573,76 @@ public class ScanFragment extends Fragment {
                                         original
                                 );
 
+                        int mode = settings.getMode();
+
                         /*
-                         * 2. Tìm tất cả hạt cà phê
+                         * 2. Tìm hạt: YOLO nếu đã có model, không thì OpenCV cũ
                          */
-                        List<Rect> rects =
-                                ImageUtils.findAllBeanRects(
-                                        enhanced
-                                );
+                        List<Rect> rects;
+
+                        if (mode == AppSettings.MODE_CLASSIFY) {
+
+                            // Chỉ phân loại: coi cả ảnh là 1 hạt
+                            rects = new ArrayList<>();
+                            rects.add(
+                                    new Rect(
+                                            0,
+                                            0,
+                                            enhanced.getWidth(),
+                                            enhanced.getHeight()
+                                    )
+                            );
+
+                        } else if (detector != null) {
+
+                            rects = detector.detect(enhanced);
+
+                        } else {
+
+                            rects = ImageUtils.findAllBeanRects(
+                                    enhanced
+                            );
+                        }
 
                         if (rects == null ||
                                 rects.isEmpty()) {
 
                             showMessage(
                                     "Không phát hiện được hạt cà phê"
+                            );
+
+                            return;
+                        }
+
+                        /*
+                         * Chế độ chỉ phát hiện: vẽ khung, không phân loại
+                         */
+                        if (mode == AppSettings.MODE_DETECT) {
+
+                            List<String> detectLabels =
+                                    new ArrayList<>();
+
+                            for (int i = 0; i < rects.size(); i++) {
+                                detectLabels.add("Fine");
+                            }
+
+                            resultBitmap =
+                                    ImageUtils.drawAllBeanBoxes(
+                                            enhanced,
+                                            rects,
+                                            detectLabels
+                                    );
+
+                            showResult(
+                                    resultBitmap,
+                                    rects.size(),
+                                    -1,
+                                    -1,
+                                    0f,
+                                    "Chỉ phát hiện hạt",
+                                    "Đang ở chế độ chỉ phát hiện. " +
+                                            "Đổi sang \"Tự động phân tích\" " +
+                                            "trong Cài đặt để phân loại lỗi."
                             );
 
                             return;
@@ -553,6 +656,7 @@ public class ScanFragment extends Fragment {
 
                         int fineCount = 0;
                         int defectCount = 0;
+                        float confidenceSum = 0f;
 
                         for (Rect rect : rects) {
 
@@ -571,6 +675,8 @@ public class ScanFragment extends Fragment {
                                     result.label;
 
                             labels.add(label);
+
+                            confidenceSum += result.confidence;
 
                             if (
                                     "Fine".equalsIgnoreCase(
@@ -602,6 +708,12 @@ public class ScanFragment extends Fragment {
                                         ? defectCount *
                                           100f /
                                           total
+                                        : 0f;
+
+                        float avgConfidence =
+                                rects.size() > 0
+                                        ? confidenceSum /
+                                          rects.size()
                                         : 0f;
 
                         /*
@@ -636,7 +748,28 @@ public class ScanFragment extends Fragment {
                                 );
 
                         /*
-                         * 8. Hiển thị kết quả
+                         * 8. Lưu lịch sử (chỉ khi đủ độ tin cậy)
+                         */
+                        boolean saved = false;
+
+                        if (total > 0 &&
+                                avgConfidence >= settings.getThreshold()) {
+
+                            saved = saveToHistory(
+                                    appContext,
+                                    resultBitmap,
+                                    total,
+                                    fineCount,
+                                    defectCount,
+                                    defectRate,
+                                    grade,
+                                    avgConfidence,
+                                    suggestion
+                            );
+                        }
+
+                        /*
+                         * 9. Hiển thị kết quả
                          */
                         showResult(
                                 resultBitmap,
@@ -647,6 +780,17 @@ public class ScanFragment extends Fragment {
                                 grade,
                                 suggestion
                         );
+
+                        if (!saved && total > 0) {
+
+                            showMessage(
+                                    String.format(
+                                            "Độ tin cậy trung bình %.0f%% thấp hơn ngưỡng " +
+                                                    "trong Cài đặt, kết quả không được lưu vào lịch sử",
+                                            avgConfidence * 100f
+                                    )
+                            );
+                        }
 
                     } catch (Exception e) {
 
@@ -725,20 +869,24 @@ public class ScanFragment extends Fragment {
                             "Tổng hạt\n" + total
                     );
 
+                    boolean detectOnly = fine < 0;
+
                     textFine.setText(
-                            "Fine\n" + fine
+                            "Fine\n" + (detectOnly ? "—" : fine)
                     );
 
                     textDefect.setText(
-                            "Defect\n" + defect
+                            "Defect\n" + (detectOnly ? "—" : defect)
                     );
 
                     textDefectRate.setText(
                             "Tỷ lệ lỗi\n" +
-                                    String.format(
-                                            "%.1f%%",
-                                            defectRate
-                                    )
+                                    (detectOnly
+                                            ? "—"
+                                            : String.format(
+                                                    "%.1f%%",
+                                                    defectRate
+                                            ))
                     );
 
                     textGrade.setText(
@@ -906,6 +1054,67 @@ public class ScanFragment extends Fragment {
     }
 
     // =========================================================
+    // LƯU LỊCH SỬ (chạy ở luồng nền)
+    // =========================================================
+
+    private boolean saveToHistory(
+            android.content.Context context,
+            Bitmap resultBitmap,
+            int total,
+            int fine,
+            int defect,
+            float defectRate,
+            String grade,
+            float avgConfidence,
+            String suggestion) {
+
+        try {
+
+            File dir = new File(context.getFilesDir(), "history");
+
+            if (!dir.exists() && !dir.mkdirs()) {
+                return false;
+            }
+
+            long now = System.currentTimeMillis();
+
+            File imageFile = new File(dir, "scan_" + now + ".jpg");
+
+            try (FileOutputStream out = new FileOutputStream(imageFile)) {
+
+                resultBitmap.compress(
+                        Bitmap.CompressFormat.JPEG,
+                        85,
+                        out
+                );
+            }
+
+            KetQuaKiemTra item = new KetQuaKiemTra();
+            item.duongDanAnh = imageFile.getAbsolutePath();
+            item.tongHat = total;
+            item.soFine = fine;
+            item.soDefect = defect;
+            item.tyLeLoi = defectRate;
+            item.xepLoai = grade;
+            item.doTinCayTB = avgConfidence;
+            item.thoiGian = now;
+            item.ghiChu = suggestion;
+
+            AppDatabase.getInstance(context)
+                    .ketQuaDao()
+                    .insert(item);
+
+            return true;
+
+        } catch (Exception e) {
+
+            Log.e("ScanFragment", "Không lưu được lịch sử", e);
+
+            return false;
+        }
+    }
+
+    // =========================================================
     // DESTROY
     // =========================================================
 
@@ -919,6 +1128,13 @@ public class ScanFragment extends Fragment {
             classifier.close();
 
             classifier = null;
+        }
+
+        if (beanDetector != null) {
+
+            beanDetector.close();
+
+            beanDetector = null;
         }
 
         if (executorService != null) {
