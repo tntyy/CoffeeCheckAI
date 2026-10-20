@@ -39,7 +39,8 @@ public class BeanDetector {
 
     private final Interpreter interpreter;
     private final int inputSize;
-    private final boolean channelsFirst;
+    private final boolean inputChannelsFirst; // true: [1,3,H,W], false: [1,H,W,3]
+    private final boolean channelsFirst;      // layout của OUTPUT
     private final int numAnchors;
     private final int numChannels;
 
@@ -50,8 +51,10 @@ public class BeanDetector {
         options.setNumThreads(4);
         interpreter = new Interpreter(loadModelFile(context), options);
 
-        int[] inShape = interpreter.getInputTensor(0).shape(); // [1, H, W, 3]
-        inputSize = inShape[1];
+        // Input có thể là NHWC [1,H,W,3] hoặc NCHW [1,3,H,W] tuỳ cách xuất model.
+        int[] inShape = interpreter.getInputTensor(0).shape();
+        inputChannelsFirst = inShape.length == 4 && inShape[1] == 3 && inShape[3] != 3;
+        inputSize = inputChannelsFirst ? inShape[2] : inShape[1];
 
         int[] outShape = interpreter.getOutputTensor(0).shape();
         // Ultralytics: [1, 4+nc, N] với N >> 4+nc
@@ -59,8 +62,10 @@ public class BeanDetector {
         numChannels = channelsFirst ? outShape[1] : outShape[2];
         numAnchors = channelsFirst ? outShape[2] : outShape[1];
 
-        Log.d(TAG, "input=" + inputSize + " output=" + outShape[1] + "x" + outShape[2]
-                + " channelsFirst=" + channelsFirst);
+        Log.d(TAG, "inputShape=" + java.util.Arrays.toString(inShape)
+                + " inputSize=" + inputSize + " inputChannelsFirst=" + inputChannelsFirst
+                + " output=" + outShape[1] + "x" + outShape[2]
+                + " outputChannelsFirst=" + channelsFirst);
     }
 
     public void setConfidenceThreshold(float threshold) {
@@ -196,12 +201,27 @@ public class BeanDetector {
         ByteBuffer buffer = ByteBuffer.allocateDirect(4 * inputSize * inputSize * 3);
         buffer.order(ByteOrder.nativeOrder());
 
-        int[] pixels = new int[inputSize * inputSize];
+        int plane = inputSize * inputSize;
+        int[] pixels = new int[plane];
         bitmap.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize);
-        for (int pixel : pixels) {
-            buffer.putFloat(((pixel >> 16) & 0xFF) / 255f);
-            buffer.putFloat(((pixel >> 8) & 0xFF) / 255f);
-            buffer.putFloat((pixel & 0xFF) / 255f);
+
+        if (inputChannelsFirst) {
+            // NCHW: toàn bộ kênh R, rồi toàn bộ kênh G, rồi toàn bộ kênh B
+            float[] data = new float[3 * plane];
+            for (int i = 0; i < plane; i++) {
+                int pixel = pixels[i];
+                data[i] = ((pixel >> 16) & 0xFF) / 255f;
+                data[plane + i] = ((pixel >> 8) & 0xFF) / 255f;
+                data[2 * plane + i] = (pixel & 0xFF) / 255f;
+            }
+            buffer.asFloatBuffer().put(data);
+        } else {
+            // NHWC: R,G,B xen kẽ theo từng pixel
+            for (int pixel : pixels) {
+                buffer.putFloat(((pixel >> 16) & 0xFF) / 255f);
+                buffer.putFloat(((pixel >> 8) & 0xFF) / 255f);
+                buffer.putFloat((pixel & 0xFF) / 255f);
+            }
         }
         buffer.rewind();
         return buffer;
