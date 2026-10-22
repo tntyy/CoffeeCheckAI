@@ -15,7 +15,8 @@ Thư viện: CameraX 1.3.4, OpenCV 4.9.0, TensorFlow Lite 2.14.0, Room 2.6.1, Ma
 
 ```
 ảnh gốc (camera/thư viện)
-  → BeanDetector (YOLO)         tìm vị trí từng hạt
+  → ImageUtils.checkQuality     OpenCV: cảnh báo ảnh tối/chói/mờ (không chặn)
+  → tìm hạt, theo Cài đặt:      BeanDetector (YOLO, mặc định) HOẶC ImageUtils.findAllBeanRects (OpenCV contour)
   → ImageUtils.cropRect         cắt từng hạt, viền 15%
   → CoffeeClassifier            Fine / Defect + độ tin cậy
   → tổng hợp                    số hạt, tỷ lệ lỗi, xếp loại, GoiYHelper.getSuggestion
@@ -34,7 +35,7 @@ Chú ý:
 - Tên `trash_*` là tên cũ còn sót từ mẫu của môn học. Bên trong là model cà phê.
 - Hai model dùng **cách chuẩn hoá khác nhau**, không dùng chung.
 - `.tflite` và `trash_labels.txt` phải thay **cùng lúc** và đúng thứ tự nhãn.
-- Ảnh **không** được `enhance()` (tăng sáng/tương phản) trước khi vào cả hai model, vì chúng được train trên ảnh gốc.
+- Ảnh đưa vào YOLO và classifier là ảnh **gốc**. `enhance()` chỉ dùng để TÌM hạt trên đường OpenCV; cắt và phân loại vẫn trên ảnh gốc (model được train trên ảnh gốc).
 
 ## 3. Trạng thái từng phần
 
@@ -42,6 +43,8 @@ Chú ý:
 |---|---|
 | Quét ảnh (camera + thư viện), 3 chế độ quét | Chạy được |
 | Phát hiện hạt bằng YOLO | Chạy được, đếm đúng số hạt trên ảnh thử |
+| Phát hiện hạt bằng OpenCV contour (Chương 2) | Chạy được, chọn trong Cài đặt; kém hơn YOLO khi có bóng/hạt dính/thiếu sáng |
+| Kiểm tra chất lượng ảnh (OpenCV) | Xong: độ sáng TB + phương sai Laplacian, chỉ cảnh báo |
 | Phân loại Fine/Defect | **Đang train lại** (xem mục 4) |
 | Room (`data/`), lưu mỗi lần quét | Xong |
 | Lịch sử (tìm kiếm, lọc, xem chi tiết, vuốt xoá) | Xong |
@@ -52,7 +55,7 @@ Chú ý:
 
 ## 4. Quyết định và lịch sử (để khỏi đi lại đường cũ)
 
-1. **Bỏ OpenCV để tìm hạt.** Canny/CLAHE/watershed thất bại với bóng, nền có hoa văn, ánh sáng yếu. `ImageUtils.findAllBeanRects` chỉ còn là đường dự phòng khi thiếu `bean_detector.tflite`. Không tinh chỉnh tiếp.
+1. **Giữ cả hai cách tìm hạt, mặc định YOLO.** Pipeline theo đề cương là CameraX → OpenCV → Room → TFLite nên OpenCV vẫn là một phần chính thức: `enhance`, `checkQuality`, `findAllBeanRects` (contour + watershed), `cropRect`, `drawAllBeanBoxes`. Người dùng chọn YOLO hoặc OpenCV trong Cài đặt. Lý do mặc định YOLO: contour thất bại với bóng, nền có hoa văn, hạt dính nhau, ánh sáng yếu (chính đề cương đã nêu rủi ro này). Câu chuyện cho báo cáo: thử contour OpenCV → đo giới hạn → nâng cấp lên object detection (YOLO). Cần thu số liệu so sánh hai cách trên cùng bộ ảnh test. Không tinh chỉnh thêm Canny/watershed; việc cần làm là đo và ghi lại kết quả.
 2. **Lỗi dữ liệu train classifier.** Dataset Roboflow *Green Bean Coffee v10* có nhãn dạng **polygon** (100% dòng nhãn). `crop_beans.py` cũ đọc như khung chữ nhật nên cắt sai. Model phân loại cũ vì vậy kém trên ảnh thật (ảnh 1 hạt luôn ra Defect). Đã viết lại ở `ml_training/rebuild_classifier_colab.py` và đang train lại.
 3. **Độ tin cậy softmax thường quá tự tin**: 100% không có nghĩa là đúng.
 4. **Cách resize**: Android dùng bilinear nên khi train cũng đặt `interpolation='bilinear'`.
@@ -61,7 +64,7 @@ Chú ý:
 ## 5. Việc còn lại (theo thứ tự)
 
 1. Train xong classifier mới, chép `trash_classifier.tflite` + `trash_labels.txt` vào `assets/`, test lại trên điện thoại.
-2. Chụp bộ ảnh test thật (ảnh 1 hạt, vài hạt, nhiều hạt dính, nền sáng/tối, có bóng), đo số hạt và độ đúng.
+2. Chụp bộ ảnh test thật (ảnh 1 hạt, vài hạt, nhiều hạt dính, nền sáng/tối, có bóng), đo số hạt và độ đúng, **với cả hai cách tìm hạt (YOLO và OpenCV)** để làm bảng so sánh cho báo cáo.
 3. Xử lý xoay ảnh theo EXIF (ảnh camera có thể bị xoay 90° khi hiển thị).
 4. Loại hoặc đánh dấu "không chắc" các hạt có độ tin cậy thấp.
 5. Quyết định và làm màn Chat.
@@ -80,3 +83,4 @@ Chú ý:
 
 - 2026-10-20: thêm Room, `BeanDetector`, Lịch sử, Thống kê, Cài đặt. Sửa `BeanDetector` cho input NCHW.
 - 2026-10-22: bỏ `enhance()` khi dùng YOLO, padding crop 0.15. Phát hiện lỗi cắt polygon, viết lại script train classifier.
+- 2026-10-22: giữ OpenCV cùng YOLO: thêm lựa chọn phương pháp tìm hạt trong Cài đặt và bước kiểm tra chất lượng ảnh (`ImageUtils.checkQuality`).

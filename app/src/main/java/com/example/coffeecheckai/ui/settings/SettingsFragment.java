@@ -41,6 +41,7 @@ public class SettingsFragment extends Fragment {
         setupVersion(root);
         setupThreshold(root);
         setupMode(root);
+        setupDetector(root);
         setupInfoRows(root);
 
         return root;
@@ -97,6 +98,18 @@ public class SettingsFragment extends Fragment {
                 settings.setMode(AppSettings.MODE_AUTO);
             }
         });
+    }
+
+    private void setupDetector(View root) {
+        RadioGroup group = root.findViewById(R.id.radioGroupDetector);
+
+        group.check(settings.getDetector() == AppSettings.DETECTOR_OPENCV
+                ? R.id.radioOpenCv : R.id.radioYolo);
+
+        group.setOnCheckedChangeListener((g, checkedId) ->
+                settings.setDetector(checkedId == R.id.radioOpenCv
+                        ? AppSettings.DETECTOR_OPENCV
+                        : AppSettings.DETECTOR_YOLO));
     }
 
     private void setupInfoRows(View root) {

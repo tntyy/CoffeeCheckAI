@@ -566,22 +566,30 @@ public class ScanFragment extends Fragment {
                         }
 
                         /*
-                         * 1. Tiền xử lý.
-                         * YOLO và model phân loại đều được train trên ảnh GỐC
-                         * (không tăng sáng/tương phản), nên chỉ dùng enhance()
-                         * cho đường OpenCV dự phòng.
+                         * 1. Kiểm tra chất lượng ảnh bằng OpenCV (tối/mờ/chói).
+                         * Chỉ cảnh báo, vẫn tiếp tục phân tích.
                          */
-                        enhanced =
-                                detector != null
-                                        ? original
-                                        : ImageUtils.enhance(
-                                                original
-                                        );
-
-                        int mode = settings.getMode();
+                        String quality = ImageUtils.checkQuality(original);
+                        if (quality != null) {
+                            toastOnUi(quality);
+                        }
 
                         /*
-                         * 2. Tìm hạt: YOLO nếu đã có model, không thì OpenCV cũ
+                         * 2. Tiền xử lý.
+                         * YOLO và model phân loại đều được train trên ảnh GỐC
+                         * (không tăng sáng/tương phản). Đường OpenCV chỉ dùng
+                         * enhance() để TÌM hạt; cắt và phân loại vẫn trên ảnh gốc.
+                         */
+                        enhanced = original;
+
+                        int mode = settings.getMode();
+                        boolean useYolo = detector != null
+                                && settings.getDetector()
+                                == AppSettings.DETECTOR_YOLO;
+
+                        /*
+                         * 3. Tìm hạt: YOLO hoặc OpenCV contour theo Cài đặt
+                         * (thiếu model YOLO thì tự dùng OpenCV)
                          */
                         List<Rect> rects;
 
@@ -598,15 +606,20 @@ public class ScanFragment extends Fragment {
                                     )
                             );
 
-                        } else if (detector != null) {
+                        } else if (useYolo) {
 
                             rects = detector.detect(enhanced);
 
                         } else {
 
-                            rects = ImageUtils.findAllBeanRects(
-                                    enhanced
-                            );
+                            Bitmap forDetect = ImageUtils.enhance(original);
+                            try {
+                                rects = ImageUtils.findAllBeanRects(
+                                        forDetect
+                                );
+                            } finally {
+                                forDetect.recycle();
+                            }
                         }
 
                         if (rects == null ||
@@ -983,6 +996,22 @@ public class ScanFragment extends Fragment {
     // =========================================================
     // MESSAGE
     // =========================================================
+
+    /** Toast ngắn trên UI thread, không tắt loading. */
+    private void toastOnUi(String message) {
+
+        if (!isAdded()) {
+            return;
+        }
+
+        requireActivity().runOnUiThread(
+                () -> Toast.makeText(
+                        requireContext(),
+                        message,
+                        Toast.LENGTH_LONG
+                ).show()
+        );
+    }
 
     private void showMessage(String message) {
 

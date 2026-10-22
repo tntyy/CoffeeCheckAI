@@ -253,6 +253,58 @@
             </RadioGroup>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Phương pháp phát hiện hạt -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp"
+            android:text="PHƯƠNG PHÁP PHÁT HIỆN HẠT"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp">
+
+            <RadioGroup
+                android:id="@+id/radioGroupDetector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radioYolo"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:paddingStart="12dp"
+                    android:text="YOLO (AI, chính xác hơn)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    app:buttonTint="@color/primary" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider" />
+
+                <com.google.android.material.radiobutton.MaterialRadioButton
+                    android:id="@+id/radioOpenCv"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:paddingStart="12dp"
+                    android:text="OpenCV (contour, xử lý ảnh cổ điển)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    app:buttonTint="@color/primary" />
+            </RadioGroup>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Thông tin ứng dụng -->
         <TextView
             android:layout_width="wrap_content"
