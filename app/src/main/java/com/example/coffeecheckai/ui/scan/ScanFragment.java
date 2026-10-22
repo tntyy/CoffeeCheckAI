@@ -566,12 +566,17 @@ public class ScanFragment extends Fragment {
                         }
 
                         /*
-                         * 1. OpenCV enhance
+                         * 1. Tiền xử lý.
+                         * YOLO và model phân loại đều được train trên ảnh GỐC
+                         * (không tăng sáng/tương phản), nên chỉ dùng enhance()
+                         * cho đường OpenCV dự phòng.
                          */
                         enhanced =
-                                ImageUtils.enhance(
-                                        original
-                                );
+                                detector != null
+                                        ? original
+                                        : ImageUtils.enhance(
+                                                original
+                                        );
 
                         int mode = settings.getMode();
 
@@ -677,6 +682,14 @@ public class ScanFragment extends Fragment {
                             labels.add(label);
 
                             confidenceSum += result.confidence;
+
+                            Log.d(
+                                    "ScanFragment",
+                                    "bean " + label +
+                                            " conf=" + result.confidence +
+                                            " rect=" + rect.x + "," + rect.y +
+                                            " " + rect.width + "x" + rect.height
+                            );
 
                             if (
                                     "Fine".equalsIgnoreCase(

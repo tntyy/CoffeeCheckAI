@@ -221,8 +221,9 @@ public class ImageUtils {
         Mat src = new Mat();
         Utils.bitmapToMat(input, src);
 
-        int padX = (int) (rect.width * 0.1);
-        int padY = (int) (rect.height * 0.1);
+        // 0.15 khớp padding_ratio của crop_beans.py lúc tạo dữ liệu train classifier.
+        int padX = (int) (rect.width * 0.15);
+        int padY = (int) (rect.height * 0.15);
 
         int x = Math.max(0, rect.x - padX);
         int y = Math.max(0, rect.y - padY);
