@@ -16,6 +16,7 @@ public class AppSettings {
     private static final String PREFS = "coffeecheck_settings";
     private static final String KEY_THRESHOLD = "confidence_threshold";
     private static final String KEY_MODE = "scan_mode";
+    private static final String KEY_ONBOARDING = "onboarding_done";
     private static final String KEY_DETECTOR = "detector_method";
 
     private final SharedPreferences prefs;
@@ -49,5 +50,14 @@ public class AppSettings {
 
     public void setDetector(int detector) {
         prefs.edit().putInt(KEY_DETECTOR, detector).apply();
+    }
+
+    /** Đã xem màn giới thiệu lần đầu chưa. */
+    public boolean isOnboardingDone() {
+        return prefs.getBoolean(KEY_ONBOARDING, false);
+    }
+
+    public void setOnboardingDone(boolean done) {
+        prefs.edit().putBoolean(KEY_ONBOARDING, done).apply();
     }
 }

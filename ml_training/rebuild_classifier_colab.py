@@ -150,6 +150,8 @@ from tensorflow.keras.optimizers import Adam
 
 IMG_SIZE = 224
 BATCH_SIZE = 32
+STEPS = 350   # ~11.000 ảnh/epoch (đủ cho bài toán 2 lớp), giúp mỗi epoch chỉ vài phút
+print('GPU:', tf.config.list_physical_devices('GPU') or 'KHÔNG CÓ GPU -> đổi Runtime sang T4 GPU rồi chạy lại!')
 
 def train_preprocess(img):
     """Làm xấu ngẫu nhiên (mờ, giảm độ phân giải) để model quen với ảnh điện thoại
@@ -204,7 +206,8 @@ out = Dense(2, activation='softmax')(x)
 model = Model(base_model.input, out)
 
 model.compile(optimizer=Adam(1e-3), loss='categorical_crossentropy', metrics=['accuracy'])
-model.fit(train_gen, validation_data=valid_gen, epochs=15, class_weight=class_weight,
+model.fit(train_gen, validation_data=valid_gen, epochs=8, steps_per_epoch=STEPS, class_weight=class_weight,
+          workers=4, use_multiprocessing=True,
           callbacks=[EarlyStopping(monitor='val_accuracy', patience=4, restore_best_weights=True)])
 
 
@@ -214,7 +217,8 @@ for layer in base_model.layers[:len(base_model.layers) - 30]:
     layer.trainable = False
 
 model.compile(optimizer=Adam(1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
-model.fit(train_gen, validation_data=valid_gen, epochs=12, class_weight=class_weight,
+model.fit(train_gen, validation_data=valid_gen, epochs=6, steps_per_epoch=STEPS, class_weight=class_weight,
+          workers=4, use_multiprocessing=True,
           callbacks=[EarlyStopping(monitor='val_accuracy', patience=4, restore_best_weights=True)])
 
 
