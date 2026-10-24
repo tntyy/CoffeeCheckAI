@@ -4,6 +4,11 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+
+import com.example.coffeecheckai.R;
+import com.example.coffeecheckai.utils.AppSettings;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -18,6 +23,27 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_splash);
+
+        // Hiện màn khởi động ngắn rồi mới xin quyền camera
+        long delay = getIntent().getBooleanExtra("skip_delay", false) ? 0 : 1500;
+        new Handler(Looper.getMainLooper()).postDelayed(this::route, delay);
+    }
+
+    /** Lần đầu mở app: xem giới thiệu. Sau đó: xin quyền camera rồi vào app. */
+    private void route() {
+        if (isFinishing() || isDestroyed()) return;
+
+        if (!new AppSettings(this).isOnboardingDone()) {
+            startActivity(new Intent(this, OnboardingActivity.class));
+            finish();
+            return;
+        }
+        checkPermissionAndStart();
+    }
+
+    private void checkPermissionAndStart() {
+        if (isFinishing() || isDestroyed()) return;
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {

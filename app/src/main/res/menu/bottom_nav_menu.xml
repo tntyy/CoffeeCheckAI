@@ -3,21 +3,21 @@
     <item
         android:id="@+id/nav_scan"
         android:icon="@drawable/camera"
-        android:title="Scan"/>
+        android:title="Quét"/>
 
     <item
         android:id="@+id/nav_history"
         android:icon="@drawable/history"
-        android:title="History"/>
+        android:title="Lịch sử"/>
 
     <item
         android:id="@+id/nav_statistics"
         android:icon="@drawable/statistics"
-        android:title="Statistics"/>
+        android:title="Thống kê"/>
 
     <item
         android:id="@+id/nav_settings"
         android:icon="@drawable/settings"
-        android:title="Settings"/>
+        android:title="Cài đặt"/>
 
 </menu>

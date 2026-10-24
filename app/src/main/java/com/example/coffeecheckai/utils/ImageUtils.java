@@ -10,6 +10,7 @@ import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfDouble;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
@@ -61,6 +62,61 @@ public class ImageUtils {
     // Watershed: "tâm hạt" phải nhô cao bao nhiêu (0-1) so với biên mới được
     // tính là 1 tâm riêng, dùng để tách các hạt đang dính sát nhau.
     private static final double DIST_THRESH = 0.45;
+
+    // ==== Kiểm tra chất lượng ảnh ====
+    private static final double MIN_BRIGHTNESS = 60;     // trung bình độ sáng (0-255)
+    private static final double MAX_BRIGHTNESS = 220;
+    private static final double MIN_SHARPNESS = 60;      // phương sai Laplacian
+
+    /**
+     * Kiểm tra ảnh quá tối / quá sáng / quá mờ bằng OpenCV
+     * (độ sáng trung bình + phương sai Laplacian trên ảnh thu nhỏ).
+     *
+     * @return câu cảnh báo cho người dùng, hoặc null nếu ảnh đạt yêu cầu
+     */
+    public static String checkQuality(Bitmap input) {
+        Mat src = new Mat();
+        Mat gray = new Mat();
+        Mat lap = new Mat();
+        MatOfDouble mean = new MatOfDouble();
+        MatOfDouble std = new MatOfDouble();
+        try {
+            Utils.bitmapToMat(input, src);
+            Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGBA2GRAY);
+
+            // Thu nhỏ để độ mờ không phụ thuộc độ phân giải máy ảnh
+            double scale = 640.0 / Math.max(gray.cols(), gray.rows());
+            if (scale < 1.0) {
+                Imgproc.resize(gray, gray, new Size(), scale, scale, Imgproc.INTER_AREA);
+            }
+
+            double brightness = Core.mean(gray).val[0];
+
+            Imgproc.Laplacian(gray, lap, CvType.CV_64F);
+            Core.meanStdDev(lap, mean, std);
+            double sharpness = Math.pow(std.get(0, 0)[0], 2);
+
+            android.util.Log.d("ImageUtils", "quality brightness=" + brightness
+                    + " sharpness=" + sharpness);
+
+            if (brightness < MIN_BRIGHTNESS) {
+                return "Ảnh hơi tối, nên chụp ở nơi đủ sáng để kết quả chính xác hơn";
+            }
+            if (brightness > MAX_BRIGHTNESS) {
+                return "Ảnh quá sáng/chói, nên tránh ánh sáng gắt";
+            }
+            if (sharpness < MIN_SHARPNESS) {
+                return "Ảnh bị mờ, nên giữ máy ổn định và chụp lại cho rõ";
+            }
+            return null;
+        } finally {
+            src.release();
+            gray.release();
+            lap.release();
+            mean.release();
+            std.release();
+        }
+    }
 
     /**
      * Tăng nhẹ tương phản và độ sáng của ảnh, giúp làm nổi bật các hạt cà phê
@@ -221,8 +277,9 @@ public class ImageUtils {
         Mat src = new Mat();
         Utils.bitmapToMat(input, src);
 
-        int padX = (int) (rect.width * 0.1);
-        int padY = (int) (rect.height * 0.1);
+        // 0.15 khớp padding_ratio của crop_beans.py lúc tạo dữ liệu train classifier.
+        int padX = (int) (rect.width * 0.15);
+        int padY = (int) (rect.height * 0.15);
 
         int x = Math.max(0, rect.x - padX);
         int y = Math.max(0, rect.y - padY);
