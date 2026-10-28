@@ -18,6 +18,14 @@ import androidx.fragment.app.Fragment;
 import com.example.coffeecheckai.R;
 import com.example.coffeecheckai.data.AppDatabase;
 import com.example.coffeecheckai.data.KetQuaKiemTra;
+import com.example.coffeecheckai.report.FileExporter;
+import com.example.coffeecheckai.report.PdfReportGenerator;
+import com.example.coffeecheckai.utils.AppSettings;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.textfield.TextInputEditText;
+import android.widget.Toast;
+import java.io.File;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
@@ -43,7 +51,7 @@ public class StatisticsFragment extends Fragment {
     private MaterialButtonToggleGroup toggleRange;
     private CircularProgressIndicator progressDonut;
     private TextView textCenterPercent, textGoodPercent, textBadPercent, textGoodSummary;
-    private LinearLayout layoutTrend;
+    private LinearLayout layoutTrend, layoutGrades;
     private TextView textTrendEmpty;
     private TextView textTotalScans, textTotalBeans, textGoodBeans, textBadBeans;
 
@@ -68,6 +76,8 @@ public class StatisticsFragment extends Fragment {
         textBadPercent = root.findViewById(R.id.textBadPercent);
         textGoodSummary = root.findViewById(R.id.textGoodSummary);
         layoutTrend = root.findViewById(R.id.layoutTrend);
+        layoutGrades = root.findViewById(R.id.layoutGrades);
+        root.findViewById(R.id.btnExportPdf).setOnClickListener(v -> showExportDialog());
         textTrendEmpty = root.findViewById(R.id.textTrendEmpty);
         textTotalScans = root.findViewById(R.id.textTotalScans);
         textTotalBeans = root.findViewById(R.id.textTotalBeans);
@@ -185,7 +195,12 @@ public class StatisticsFragment extends Fragment {
         textCenterPercent.setText(goodPercent + "%");
         textGoodPercent.setText(goodPercent + "%");
         textBadPercent.setText(badPercent + "%");
-        textGoodSummary.setText(fine + " / " + totalBeans + " hạt đạt chuẩn");
+        String summary = fine + " / " + totalBeans + " hạt đạt chuẩn";
+        if (totalBeans > 0) {
+            summary += "\nXếp loại chung: "
+                    + new AppSettings(requireContext()).gradeFor(badPercent);
+        }
+        textGoodSummary.setText(summary);
 
         textTotalScans.setText(String.valueOf(items.size()));
         textTotalBeans.setText(String.valueOf(totalBeans));
@@ -193,6 +208,7 @@ public class StatisticsFragment extends Fragment {
         textBadBeans.setText(String.valueOf(defect));
 
         renderTrend(items);
+        renderGrades(items);
     }
 
     /** Mỗi ngày có dữ liệu là một dòng: tỉ lệ hạt đạt của ngày đó. */
@@ -232,6 +248,112 @@ public class StatisticsFragment extends Fragment {
             ((TextView) row.findViewById(R.id.textTrendPercent)).setText(percent + "%");
             layoutTrend.addView(row);
         }
+    }
+
+    private void renderGrades(List<KetQuaKiemTra> items) {
+        layoutGrades.removeAllViews();
+        String[] names = {"Tốt", "Khá", "Trung bình", "Cần kiểm tra"};
+        int[] colors = {0xFF34D399, 0xFFA3E635, 0xFFFBBF24, 0xFFF87171};
+        int[] counts = new int[4];
+        for (KetQuaKiemTra k : items) {
+            int idx = 3;
+            for (int i = 0; i < 3; i++) if (names[i].equals(k.xepLoai)) idx = i;
+            counts[idx]++;
+        }
+        LayoutInflater inflater = LayoutInflater.from(requireContext());
+        for (int i = 0; i < 4; i++) {
+            View row = inflater.inflate(R.layout.layout_item_grade_row, layoutGrades, false);
+            ((TextView) row.findViewById(R.id.textGradeName)).setText(names[i]);
+            LinearProgressIndicator bar = row.findViewById(R.id.progressGrade);
+            bar.setIndicatorColor(colors[i]);
+            bar.setProgress(items.isEmpty() ? 0 : Math.round(counts[i] * 100f / items.size()));
+            ((TextView) row.findViewById(R.id.textGradeCount)).setText(String.valueOf(counts[i]));
+            layoutGrades.addView(row);
+        }
+    }
+
+    // =========================================================
+    // XUẤT PDF
+    // =========================================================
+
+    private void showExportDialog() {
+        BottomSheetDialog dialog = new BottomSheetDialog(requireContext());
+        View v = getLayoutInflater().inflate(R.layout.dialog_export_pdf, null);
+        dialog.setContentView(v);
+
+        AppSettings settings = new AppSettings(requireContext());
+        TextInputEditText editInspector = v.findViewById(R.id.editInspector);
+        TextInputEditText editFacility = v.findViewById(R.id.editFacility);
+        editInspector.setText(settings.getInspector());
+        editFacility.setText(settings.getFacility());
+
+        v.findViewById(R.id.btnSavePdf).setOnClickListener(b -> {
+            doExport(v, settings, false);
+            dialog.dismiss();
+        });
+        v.findViewById(R.id.btnSharePdf).setOnClickListener(b -> {
+            doExport(v, settings, true);
+            dialog.dismiss();
+        });
+        dialog.show();
+    }
+
+    private void doExport(View v, AppSettings settings, boolean share) {
+        if (executor == null) return;
+
+        PdfReportGenerator.Options o = new PdfReportGenerator.Options();
+        o.summary = ((MaterialSwitch) v.findViewById(R.id.swSummary)).isChecked();
+        o.trend = ((MaterialSwitch) v.findViewById(R.id.swTrend)).isChecked();
+        o.table = ((MaterialSwitch) v.findViewById(R.id.swTable)).isChecked();
+        o.thumbnails = ((MaterialSwitch) v.findViewById(R.id.swThumbs)).isChecked();
+        o.inspector = String.valueOf(((TextInputEditText) v.findViewById(R.id.editInspector)).getText()).trim();
+        o.facility = String.valueOf(((TextInputEditText) v.findViewById(R.id.editFacility)).getText()).trim();
+        settings.setInspector(o.inspector);
+        settings.setFacility(o.facility);
+
+        int checked = ((com.google.android.material.chip.ChipGroup) v.findViewById(R.id.chipRange))
+                .getCheckedChipId();
+        long from = rangeFrom, to = rangeTo;
+        int days = checked == R.id.chip7 ? 7 : checked == R.id.chip30 ? 30 : checked == R.id.chip90 ? 90 : 0;
+        if (days > 0) {
+            Calendar end = Calendar.getInstance();
+            end.set(Calendar.HOUR_OF_DAY, 23);
+            end.set(Calendar.MINUTE, 59);
+            end.set(Calendar.SECOND, 59);
+            to = end.getTimeInMillis();
+            from = startOfDay(to) - (days - 1L) * DAY_MS;
+        }
+        o.from = from;
+        o.to = to;
+
+        final Context appContext = requireContext().getApplicationContext();
+        final long qFrom = from, qTo = to;
+        Toast.makeText(appContext, "Đang tạo báo cáo PDF...", Toast.LENGTH_SHORT).show();
+
+        executor.execute(() -> {
+            try {
+                List<KetQuaKiemTra> items = AppDatabase.getInstance(appContext)
+                        .ketQuaDao().getBetween(qFrom, qTo);
+                String name = "BaoCao_CoffeeCheck_"
+                        + new SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(new java.util.Date())
+                        + ".pdf";
+                File file = new PdfReportGenerator()
+                        .generate(FileExporter.cacheFile(appContext, name), items, o);
+
+                String where = share ? null : FileExporter.saveToDownloads(appContext, file, "application/pdf");
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    if (share) {
+                        startActivity(FileExporter.shareIntent(requireContext(), file, "application/pdf"));
+                    } else {
+                        Toast.makeText(requireContext(), "Đã lưu: " + where, Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> Toast.makeText(appContext,
+                        "Không tạo được PDF: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     @Override

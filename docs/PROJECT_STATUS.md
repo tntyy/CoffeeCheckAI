@@ -84,3 +84,4 @@ Chú ý:
 - 2026-10-20: thêm Room, `BeanDetector`, Lịch sử, Thống kê, Cài đặt. Sửa `BeanDetector` cho input NCHW.
 - 2026-10-22: bỏ `enhance()` khi dùng YOLO, padding crop 0.15. Phát hiện lỗi cắt polygon, viết lại script train classifier.
 - 2026-10-22: giữ OpenCV cùng YOLO: thêm lựa chọn phương pháp tìm hạt trong Cài đặt và bước kiểm tra chất lượng ảnh (`ImageUtils.checkQuality`).
+- 2026-10-28: Thống kê có xuất PDF (`report/PdfReportGenerator`, `FileExporter`, FileProvider) và phân bố xếp loại; Cài đặt chia nhóm (ngưỡng YOLO, kiểm tra chất lượng ảnh, quy tắc xếp loại chỉnh được thay cho luật tạm, flash/lưới/rung, tự lưu, tự xóa lịch sử cũ, xuất CSV, xóa lịch sử); thêm mục Chat trên menu (màn chờ, chưa có chức năng). Xếp loại giờ dùng `AppSettings.gradeFor()`.

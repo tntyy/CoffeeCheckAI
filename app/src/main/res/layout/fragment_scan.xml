@@ -15,6 +15,13 @@
         android:layout_height="match_parent"
         />
 
+    <!-- LƯỚI CĂN CHỈNH (bật/tắt trong Cài đặt) -->
+    <com.example.coffeecheckai.ui.scan.GridOverlayView
+        android:id="@+id/gridOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <!-- HEADER -->
     <LinearLayout
         android:layout_width="match_parent"

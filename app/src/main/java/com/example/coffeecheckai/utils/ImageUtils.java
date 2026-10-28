@@ -302,7 +302,18 @@ public class ImageUtils {
      * trực quan: xanh lá = Fine (đạt), đỏ = Defect (lỗi).
      */
     public static Bitmap drawAllBeanBoxes(Bitmap input, List<Rect> rects, List<String> labels) {
-        Bitmap output = input.copy(Bitmap.Config.ARGB_8888, true);
+        return drawAllBeanBoxes(input, rects, labels, false);
+    }
+
+    /** enhance = true: tăng sáng/tương phản ảnh hiển thị (không ảnh hưởng kết quả phân loại). */
+    public static Bitmap drawAllBeanBoxes(Bitmap input, List<Rect> rects, List<String> labels,
+                                          boolean enhance) {
+        Bitmap output = enhance ? enhance(input) : input.copy(Bitmap.Config.ARGB_8888, true);
+        if (!output.isMutable()) {
+            Bitmap m = output.copy(Bitmap.Config.ARGB_8888, true);
+            output.recycle();
+            output = m;
+        }
         Canvas canvas = new Canvas(output);
 
         Paint paint = new Paint();

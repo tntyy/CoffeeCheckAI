@@ -24,4 +24,10 @@ public interface KetQuaKiemTraDao {
 
     @Query("SELECT * FROM ket_qua_kiem_tra WHERE thoiGian BETWEEN :from AND :to ORDER BY thoiGian ASC")
     List<KetQuaKiemTra> getBetween(long from, long to);
+
+    @Query("DELETE FROM ket_qua_kiem_tra WHERE thoiGian < :before")
+    int deleteOlderThan(long before);
+
+    @Query("SELECT COUNT(*) FROM ket_qua_kiem_tra")
+    int count();
 }

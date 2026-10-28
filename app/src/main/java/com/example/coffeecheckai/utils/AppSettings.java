@@ -60,4 +60,56 @@ public class AppSettings {
     public void setOnboardingDone(boolean done) {
         prefs.edit().putBoolean(KEY_ONBOARDING, done).apply();
     }
+
+    // ---------------- Cài đặt mở rộng ----------------
+
+    /** Ngưỡng phát hiện hạt của YOLO (0.1 - 0.9). */
+    public float getDetectThreshold() { return prefs.getFloat("detect_threshold", 0.4f); }
+    public void setDetectThreshold(float v) { prefs.edit().putFloat("detect_threshold", v).apply(); }
+
+    public boolean isQualityCheck() { return prefs.getBoolean("quality_check", true); }
+    public void setQualityCheck(boolean v) { prefs.edit().putBoolean("quality_check", v).apply(); }
+
+    /** Tăng cường ảnh (OpenCV) chỉ áp dụng cho ảnh kết quả hiển thị. */
+    public boolean isEnhanceDisplay() { return prefs.getBoolean("enhance_display", true); }
+    public void setEnhanceDisplay(boolean v) { prefs.edit().putBoolean("enhance_display", v).apply(); }
+
+    // Quy tắc xếp loại (tỷ lệ lỗi %)
+    public float getGradeGood() { return prefs.getFloat("grade_good", 0f); }
+    public float getGradeFair() { return prefs.getFloat("grade_fair", 10f); }
+    public float getGradeMid() { return prefs.getFloat("grade_mid", 25f); }
+    public void setGradeLimits(float good, float fair, float mid) {
+        prefs.edit().putFloat("grade_good", good).putFloat("grade_fair", fair)
+                .putFloat("grade_mid", mid).apply();
+    }
+    public void resetGradeLimits() { setGradeLimits(0f, 10f, 25f); }
+
+    // Camera
+    public boolean isFlashDefault() { return prefs.getBoolean("flash_default", false); }
+    public void setFlashDefault(boolean v) { prefs.edit().putBoolean("flash_default", v).apply(); }
+    public boolean isGrid() { return prefs.getBoolean("grid", true); }
+    public void setGrid(boolean v) { prefs.edit().putBoolean("grid", v).apply(); }
+    public boolean isVibrate() { return prefs.getBoolean("vibrate", true); }
+    public void setVibrate(boolean v) { prefs.edit().putBoolean("vibrate", v).apply(); }
+
+    // Dữ liệu
+    public boolean isAutoSave() { return prefs.getBoolean("auto_save", true); }
+    public void setAutoSave(boolean v) { prefs.edit().putBoolean("auto_save", v).apply(); }
+    /** Số ngày giữ lịch sử; 0 = không tự xóa. */
+    public int getKeepDays() { return prefs.getInt("keep_days", 0); }
+    public void setKeepDays(int d) { prefs.edit().putInt("keep_days", d).apply(); }
+
+    // Hồ sơ (in lên báo cáo PDF)
+    public String getInspector() { return prefs.getString("inspector", ""); }
+    public void setInspector(String v) { prefs.edit().putString("inspector", v).apply(); }
+    public String getFacility() { return prefs.getString("facility", ""); }
+    public void setFacility(String v) { prefs.edit().putString("facility", v).apply(); }
+
+    /** Xếp loại theo tỷ lệ lỗi (%) và các ngưỡng trong Cài đặt. */
+    public String gradeFor(float defectRate) {
+        if (defectRate <= getGradeGood()) return "Tốt";
+        if (defectRate <= getGradeFair()) return "Khá";
+        if (defectRate <= getGradeMid()) return "Trung bình";
+        return "Cần kiểm tra";
+    }
 }

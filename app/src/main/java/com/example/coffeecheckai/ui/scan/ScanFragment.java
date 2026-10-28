@@ -315,6 +315,10 @@ public class ScanFragment extends Fragment {
 
                         imageCapture =
                                 new ImageCapture.Builder()
+                                        .setFlashMode(
+                                                new AppSettings(requireContext()).isFlashDefault()
+                                                        ? ImageCapture.FLASH_MODE_ON
+                                                        : ImageCapture.FLASH_MODE_OFF)
                                         .build();
 
                         cameraProvider.unbindAll();
@@ -397,6 +401,8 @@ public class ScanFragment extends Fragment {
                     @Override
                     public void onImageSaved(
                             @NonNull ImageCapture.OutputFileResults outputFileResults) {
+
+                        vibrateIfEnabled();
 
                         Toast.makeText(
                                 requireContext(),
@@ -569,7 +575,8 @@ public class ScanFragment extends Fragment {
                          * 1. Kiểm tra chất lượng ảnh bằng OpenCV (tối/mờ/chói).
                          * Chỉ cảnh báo, vẫn tiếp tục phân tích.
                          */
-                        String quality = ImageUtils.checkQuality(original);
+                        String quality = settings.isQualityCheck()
+                                ? ImageUtils.checkQuality(original) : null;
                         if (quality != null) {
                             toastOnUi(quality);
                         }
@@ -583,6 +590,10 @@ public class ScanFragment extends Fragment {
                         enhanced = original;
 
                         int mode = settings.getMode();
+                        if (detector != null) {
+                            detector.setConfidenceThreshold(
+                                    settings.getDetectThreshold());
+                        }
                         boolean useYolo = detector != null
                                 && settings.getDetector()
                                 == AppSettings.DETECTOR_YOLO;
@@ -648,7 +659,8 @@ public class ScanFragment extends Fragment {
                                     ImageUtils.drawAllBeanBoxes(
                                             enhanced,
                                             rects,
-                                            detectLabels
+                                            detectLabels,
+                                            settings.isEnhanceDisplay()
                                     );
 
                             showResult(
@@ -749,7 +761,7 @@ public class ScanFragment extends Fragment {
                          * đúng quy tắc trong đề cương.
                          */
                         String grade =
-                                calculateGrade(
+                                settings.gradeFor(
                                         defectRate
                                 );
 
@@ -770,7 +782,8 @@ public class ScanFragment extends Fragment {
                                 ImageUtils.drawAllBeanBoxes(
                                         enhanced,
                                         rects,
-                                        labels
+                                        labels,
+                                        settings.isEnhanceDisplay()
                                 );
 
                         /*
@@ -778,7 +791,7 @@ public class ScanFragment extends Fragment {
                          */
                         boolean saved = false;
 
-                        if (total > 0 &&
+                        if (total > 0 && settings.isAutoSave() &&
                                 avgConfidence >= settings.getThreshold()) {
 
                             saved = saveToHistory(
@@ -1037,22 +1050,23 @@ public class ScanFragment extends Fragment {
     // GRADE - TẠM THỜI
     // =========================================================
 
-    private String calculateGrade(
-            float defectRate) {
-
-        if (defectRate == 0) {
-            return "Tốt";
+    private void vibrateIfEnabled() {
+        if (!new AppSettings(requireContext()).isVibrate()) return;
+        android.os.Vibrator v = requireContext().getSystemService(android.os.Vibrator.class);
+        if (v != null && v.hasVibrator()) {
+            v.vibrate(android.os.VibrationEffect.createOneShot(
+                    60, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
         }
+    }
 
-        if (defectRate <= 10) {
-            return "Khá";
+    @Override
+    public void onResume() {
+        super.onResume();
+        View grid = getView() == null ? null : getView().findViewById(R.id.gridOverlay);
+        if (grid != null) {
+            grid.setVisibility(new AppSettings(requireContext()).isGrid()
+                    ? View.VISIBLE : View.GONE);
         }
-
-        if (defectRate <= 25) {
-            return "Trung bình";
-        }
-
-        return "Cần kiểm tra";
     }
 
     // =========================================================
