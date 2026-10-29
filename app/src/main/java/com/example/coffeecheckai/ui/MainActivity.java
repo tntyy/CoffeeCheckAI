@@ -1,7 +1,5 @@
 package com.example.coffeecheckai.ui;
 
-import static androidx.core.content.ContentProviderCompat.requireContext;
-
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.util.Log;
@@ -18,6 +16,9 @@ import com.example.coffeecheckai.ui.scan.ScanFragment;
 import com.example.coffeecheckai.ui.history.HistoryFragment;
 import com.example.coffeecheckai.ui.statistics.StatisticsFragment;
 import com.example.coffeecheckai.ui.settings.SettingsFragment;
+import com.example.coffeecheckai.ui.chat.ChatFragment;
+import com.example.coffeecheckai.data.AppDatabase;
+import com.example.coffeecheckai.utils.AppSettings;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationBarView;
 import android.net.Uri;
@@ -42,8 +43,21 @@ public class MainActivity extends AppCompatActivity {
         findViews();
         setupListeners();
 
+        cleanOldHistory();
+
         // Mặc định mở tab Scan khi mở app
         replaceFragment(new ScanFragment());
+    }
+
+    /** Xóa lịch sử cũ hơn số ngày đặt trong Cài đặt (0 = giữ mãi). */
+    private void cleanOldHistory() {
+        final int keepDays = new AppSettings(this).getKeepDays();
+        if (keepDays <= 0) return;
+        final android.content.Context ctx = getApplicationContext();
+        Executors.newSingleThreadExecutor().execute(() -> {
+            long before = System.currentTimeMillis() - keepDays * 24L * 60 * 60 * 1000;
+            AppDatabase.getInstance(ctx).ketQuaDao().deleteOlderThan(before);
+        });
     }
 
     private void findViews() {
@@ -61,6 +75,8 @@ public class MainActivity extends AppCompatActivity {
                     replaceFragment(new HistoryFragment());
                 } else if (id == R.id.nav_statistics) {
                     replaceFragment(new StatisticsFragment());
+                } else if (id == R.id.nav_chat) {
+                    replaceFragment(new ChatFragment());
                 } else if (id == R.id.nav_settings) {
                     replaceFragment(new SettingsFragment());
                 }

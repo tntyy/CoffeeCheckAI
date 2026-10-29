@@ -43,6 +43,9 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)
 
+    // RecyclerView (màn Lịch sử)
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
     annotationProcessor("androidx.room:room-compiler:2.6.1")
