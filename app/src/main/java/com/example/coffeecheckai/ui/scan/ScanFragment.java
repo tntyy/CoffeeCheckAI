@@ -558,7 +558,7 @@ public class ScanFragment extends Fragment {
                          * Đọc ảnh
                          */
                         original =
-                                BitmapFactory.decodeFile(
+                                ImageUtils.loadUpright(
                                         photoFile.getAbsolutePath()
                                 );
 

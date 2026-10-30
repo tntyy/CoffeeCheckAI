@@ -122,6 +122,29 @@ public class ImageUtils {
      * Tăng nhẹ tương phản và độ sáng của ảnh, giúp làm nổi bật các hạt cà phê
      * trước khi đưa vào bước phát hiện contour và phân loại AI.
      */
+    /** Đọc ảnh từ file và xoay đúng chiều theo EXIF (ảnh chụp dọc thường bị nằm ngang). */
+    public static Bitmap loadUpright(String path) {
+        Bitmap bmp = android.graphics.BitmapFactory.decodeFile(path);
+        if (bmp == null) return null;
+        int degrees = 0;
+        try {
+            int o = new android.media.ExifInterface(path).getAttributeInt(
+                    android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL);
+            if (o == android.media.ExifInterface.ORIENTATION_ROTATE_90) degrees = 90;
+            else if (o == android.media.ExifInterface.ORIENTATION_ROTATE_180) degrees = 180;
+            else if (o == android.media.ExifInterface.ORIENTATION_ROTATE_270) degrees = 270;
+        } catch (java.io.IOException ignored) {
+            // không đọc được EXIF -> giữ nguyên
+        }
+        if (degrees == 0) return bmp;
+        android.graphics.Matrix m = new android.graphics.Matrix();
+        m.postRotate(degrees);
+        Bitmap rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+        if (rotated != bmp) bmp.recycle();
+        return rotated;
+    }
+
     public static Bitmap enhance(Bitmap input) {
         Mat src = new Mat();
         Utils.bitmapToMat(input, src);
